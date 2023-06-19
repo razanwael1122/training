@@ -1,0 +1,303 @@
+using Plugin.Media;
+using System;
+using System.ComponentModel;
+using System.IO;
+using Xamarin.Forms;
+using Xamarin.Forms.Xaml;
+
+namespace App1.Views
+{
+    public partial class AboutPage : ContentPage
+    {
+        public AboutPage()
+        {
+            InitializeComponent();
+        }
+
+        
+
+        private async void BtnTakePhoto_Clicked(object sender, EventArgs e)
+        {
+            var file = await CrossMedia.Current.TakePhotoAsync(new Plugin.Media.Abstractions.StoreCameraMediaOptions
+            {
+                Name = DateTime.Now.Millisecond.ToString() + ".jpg",
+                Directory = "Pictures"
+            });
+
+            if (file != null)
+            {
+                // Save the file to the device's Pictures folder
+                var filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), file.Path);
+                File.Move(file.Path, filePath);
+
+                // Display an alert to show the path where the image was saved
+                await DisplayAlert("Image saved", $"Image saved to {filePath}", "OK");
+
+                // Display the image in the app
+                myImage.Source = ImageSource.FromFile(filePath);
+            }
+            
+
+            else
+            {
+                await DisplayAlert("Alert!", "Camera is not available", "ok");
+            }
+        }
+    }
+}
+#########################################
+
+
+        private async void BtnTakePhoto_Clicked(object sender, EventArgs e)
+        {
+           
+                var crossmedia = CrossMedia.Current;
+
+                if (crossmedia.IsCameraAvailable && crossmedia.IsTakePhotoSupported)
+                {
+                    // Take the first photo
+                    var firstPhoto = await crossmedia.TakePhotoAsync(new Plugin.Media.Abstractions.StoreCameraMediaOptions
+                    {
+                        Name = "FirstPhoto.jpg",
+                        Directory = "Pictures"
+                    });
+
+                    if (firstPhoto != null)
+                    {
+                        // Take the second photo
+                        var secondPhoto = await crossmedia.TakePhotoAsync(new Plugin.Media.Abstractions.StoreCameraMediaOptions
+                        {
+                            Name = "SecondPhoto.jpg",
+                            Directory = "Pictures"
+                        });
+
+                        if (secondPhoto != null)
+                        {
+                            // Combine the two photos using SkiaSharp
+                            using (var firstBitmap = SKBitmap.Decode(firstPhoto.GetStreamWithImageRotatedForExternalStorage()))
+                            using (var secondBitmap = SKBitmap.Decode(secondPhoto.GetStreamWithImageRotatedForExternalStorage()))
+                            using (var surface = SKSurface.Create(new SKImageInfo(firstBitmap.Width + secondBitmap.Width, Math.Max(firstBitmap.Height, secondBitmap.Height))))
+                            {
+                                // Draw the first photo on the left side of the surface
+                                var canvas = surface.Canvas;
+                                canvas.DrawBitmap(firstBitmap, SKRect.Create(firstBitmap.Width, 0, secondBitmap.Width, secondBitmap.Height));
+
+                                // Draw the second photo on the right side of the surface
+                                canvas.DrawBitmap(secondBitmap, SKRect.Create(0, 0, firstBitmap.Width, firstBitmap.Height));
+
+                            // Save the combined image to a specific folder
+                            var folderPath = "/storage/emulated/0/Android/data/com.companyname.app1/files/Pictures";
+                            var filePath = Path.Combine(folderPath, "CombinedPhoto.jpg");
+                            Directory.CreateDirectory(folderPath);
+                            using (var image = surface.Snapshot())
+                            using (var data = image.Encode(SKEncodedImageFormat.Jpeg, 100))
+                            using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                            {
+                                data.SaveTo(stream);
+                            }
+
+
+                            // Display an alert to show the path where the image was saved
+                            await DisplayAlert("Image saved", $"Image saved to {filePath}", "OK");
+
+                                // Display the image in the app
+                                myImage.Source = ImageSource.FromFile(filePath);
+                            }
+                        }
+                        else
+                        {
+                            await DisplayAlert("No second photo taken", "Unable to take second photo", "OK");
+                        }
+                    }
+                    else
+                    {
+                        await DisplayAlert("No first photo taken", "Unable to take first photo", "OK");
+                    }
+                }
+                else
+                {
+                    await DisplayAlert("Alert!", "Camera is not available", "ok");
+                }
+            }
+
+        }
+    }
+///////////////////////////////////////////////////////////////////////////
+using Plugin.Media;
+using SkiaSharp;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using Xamarin.Forms;
+using Xamarin.Forms.PlatformConfiguration;
+using Xamarin.Forms.Xaml;
+using static Xamarin.Forms.Internals.GIFBitmap;
+
+
+namespace App1.Views
+{
+    public partial class AboutPage : ContentPage
+    {
+        public AboutPage()
+        {
+            InitializeComponent();
+        }
+
+        private bool isCapturing = false; // Toggle to start/stop capturing
+        private List<SKBitmap> bitmaps = new List<SKBitmap>(); // List to store captured bitmaps
+
+        private async void BtnTakePhoto_Clicked(object sender, EventArgs e)
+        {
+            var crossmedia = CrossMedia.Current;
+
+            if (!isCapturing)
+            {
+                // Start capturing
+                isCapturing = true;
+                btnTakePhoto.Text = "Stop Capturing";
+
+                while (isCapturing)
+                {
+                    if (crossmedia.IsCameraAvailable && crossmedia.IsTakePhotoSupported)
+                    {
+                        var photo = await crossmedia.TakePhotoAsync(new Plugin.Media.Abstractions.StoreCameraMediaOptions
+                        {
+                            Name = $"Photo{bitmaps.Count}.jpg",
+                            Directory = "Pictures"
+                        });
+
+                        if (photo == null)
+                        {
+                            await DisplayAlert("Unable to take photo", $"Error taking photo {bitmaps.Count}", "OK");
+                            break; // exit loop if unable to take photo
+                        }
+
+                        var bitmap = SKBitmap.Decode(photo.GetStreamWithImageRotatedForExternalStorage());
+                        bitmaps.Add(bitmap);
+                    }
+                    else
+                    {
+                        await DisplayAlert("Alert!", "Camera is not available", "OK");
+                        break; // exit loop if camera is not available
+                    }
+                }
+
+                if (bitmaps.Count > 0)
+                {
+                    // combine bitmaps into panorama using SkiaSharp
+                    int width = bitmaps.Sum(b => b.Width);
+                    int height = bitmaps.Max(b => b.Height);
+                    using (var surface = SKSurface.Create(new SKImageInfo(width, height)))
+                    {
+                        var canvas = surface.Canvas;
+                        int x = 0;
+                        foreach (var bitmap in bitmaps)
+                        {
+                            canvas.DrawBitmap(bitmap, x, 0);
+                            x += bitmap.Width;
+                        }
+
+                        // save combined image to a specific folder
+                        var folderPath = "/storage/emulated/0/Android/data/com.companyname.app1/files/Pictures";
+                        var filePath = Path.Combine(folderPath, "Panorama.jpg");
+                        Directory.CreateDirectory(folderPath);
+                        using (var image = surface.Snapshot())
+                        using (var data = image.Encode(SKEncodedImageFormat.Jpeg, 100))
+                        using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                        {
+                            data.SaveTo(stream);
+                        }
+
+                        // display an alert to show the path where the image was saved
+                        await DisplayAlert("Image saved", $"Image saved to {filePath}", "OK");
+
+                        // display the image in the app
+                        myImage.Source = ImageSource.FromFile(filePath);
+                    }
+                }
+
+                // Reset capturing state
+                isCapturing = false;
+                btnTakePhoto.Text = "Start Capturing";
+                bitmaps.Clear();
+            }
+            else
+            {
+                // Stop capturing
+                isCapturing = false;
+                btnTakePhoto.Text = "Start Capturing";
+                bitmaps.Clear();
+            }
+        }
+
+
+    }
+}
+
+
+
+
+
+
+//
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+using System;
+using System.IO;
+using System.Linq;
+using ImageMagick;
+
+class Program
+{
+    static void Main()
+    {
+        string sourceFolderPath = @"C:\Photos";  // Replace with the path to your source folder
+        string destinationFolderPath = @"C:\ProcessedPhotos";  // Replace with the path to your destination folder
+
+        // Get all files with supported image extensions from the source folder
+        string[] imageFiles = Directory.GetFiles(sourceFolderPath, "*.*", SearchOption.TopDirectoryOnly)
+            .Where(file => file.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                           || file.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase)
+                           || file.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                           || file.EndsWith(".gif", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        // Create the destination folder if it doesn't exist
+        Directory.CreateDirectory(destinationFolderPath);
+
+        // Process each image file
+        foreach (string imageFile in imageFiles)
+        {
+            string destinationFilePath = Path.Combine(destinationFolderPath, Path.GetFileName(imageFile));
+
+            // Process the image (e.g., resize, apply filters, etc.)
+            ProcessImage(imageFile, destinationFilePath);
+
+            Console.WriteLine($"Processed: {imageFile}");
+        }
+
+        Console.WriteLine("All photos processed.");
+        Console.ReadLine();
+    }
+
+    static void ProcessImage(string sourceFilePath, string destinationFilePath)
+    {
+        using (var image = new MagickImage(sourceFilePath))
+        {
+            // Process the image as needed (e.g., resize, apply filters, etc.)
+
+            // Example: Resizing the image to a width of 800 pixels while maintaining the aspect ratio
+            int width = 800;
+            int height = (int)(((double)width / image.Width) * image.Height);
+
+            image.Resize(width, height);
+
+            // Save the processed image to the destination folder
+            image.Write(destinationFilePath);
+        }
+    }
+}

@@ -1,0 +1,58 @@
+import cv2
+import numpy as np
+from google.colab.patches import cv2_imshow
+img = cv2.imread('1 (6).png')
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+ret,thresh = cv2.threshold(gray,125,255,0)
+contours,hierarchy = cv2.findContours(thresh, 1, 2)
+print("Number of contours detected:", len(contours))
+
+for cnt in contours:
+   x1,y1 = cnt[0][0]
+   approx = cv2.approxPolyDP(cnt, 0.01*cv2.arcLength(cnt, True), True)
+   if len(approx) == 4:
+      x, y, w, h = cv2.boundingRect(cnt)
+      ratio = float(w)/h
+      if ratio > 0.9 and ratio <1.1 :
+         cv2.putText(img, '1', (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+         img = cv2.drawContours(img, [cnt], -1, (0,255,0), 3)
+
+#cv2.imshow(img)
+cv2_imshow(img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+//////////////////////////////////////////////////////////////
+
+import cv2
+import numpy as np
+from google.colab.patches import cv2_imshow
+
+# Read the medical slide image
+img = cv2.imread('1 (6).png')
+
+# Convert the image to grayscale
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+# Threshold the grayscale image to isolate the medical slide
+ret, thresh = cv2.threshold(gray, 125, 255, cv2.THRESH_BINARY)
+
+# Find contours in the thresholded image
+contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+# Iterate through each contour and check if it is a rectangle with a 3:2 aspect ratio
+for cnt in contours:
+    x, y, w, h = cv2.boundingRect(cnt)
+    ratio = float((w) / h)
+    if ratio >= 0.9  :
+        # Draw a green contour around the rectangle
+        img = cv2.drawContours(img, [cnt], -1, (0, 255, 0), 3)
+        
+        # Add the medical slide label at the top-left corner of the rectangle
+        cv2.putText(img, '1', (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0),3)
+
+# Display the modified image
+cv2_imshow(img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
